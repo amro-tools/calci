@@ -1,0 +1,14 @@
+name: calcienv
+channels:
+  - conda-forge
+dependencies:
+  - pybind11
+  - pytest
+  - ninja
+  - cmake
+  - catch2
+  - meson>=1.2.3
+  - meson-python
+  - pip
+  - numpy
+  - ase
