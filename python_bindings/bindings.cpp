@@ -1,7 +1,6 @@
+#include <calci/backend.hpp>
 #include <calci/defines.hpp>
 #include <calci/utils.hpp>
-#include <calci/backend.hpp>
-
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
@@ -21,7 +20,6 @@ namespace py = pybind11;              // Convention
 
 PYBIND11_MODULE( calcicpp, m )
 {
-    m.def( "check_constraints", &Calci::mic, "Wrapped vector obtained from minimum image convention." );
     m.def( "set_num_threads", &Calci::Backend::set_num_threads );
     m.def( "get_num_threads", &Calci::Backend::get_num_threads );
 }

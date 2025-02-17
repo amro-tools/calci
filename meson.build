@@ -76,7 +76,8 @@ python_deps = deps + [
 py.extension_module(
   'calcicpp',
   sources : [
-    'python_bindings/bindings.cpp'
+    'python_bindings/bindings.cpp',
+    'src/lennard_jones.cpp'
   ],
   # include_directories: ,
   dependencies: python_deps,
