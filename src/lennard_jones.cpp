@@ -54,14 +54,18 @@ void LennardJones::recompute_neighbour_lists( const Eigen::Ref<Vectorfield> posi
 
 double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions, Eigen::Ref<Vectorfield> forces )
 {
+    recompute_neighbour_lists( positions );
+
+    const int n_atoms = positions.rows();
+
     // Make sure the energy buffer always has the same size as the positions
-    if( energy_buffer_atoms.size() != positions.size() )
+    if( energy_buffer_atoms.size() != n_atoms )
     {
-        energy_buffer_atoms.resize( positions.size() );
+        energy_buffer_atoms.resize( n_atoms );
     }
 
     // zero out the forces and energy buffer
-    Backend::for_each( forces.size(), [&]( int i ) {
+    Backend::for_each( n_atoms, [&]( int i ) {
         forces.row( i )        = Vector3::Zero();
         energy_buffer_atoms[i] = 0.0;
     } );
@@ -76,6 +80,7 @@ double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions,
 
         // V_{ij} = 4 \epsilon * ( (\sigma/R_{ij})^12 - (\sigma/R_{ij})^6 )
         const double Vij = 4.0 * epsilon * sigma_R_6 * ( sigma_R_6 - 1.0 );
+
         // factor of 1/2 to account for double counting in the neighbour list
         energy_buffer_atoms[n] += 0.5 * Vij;
 

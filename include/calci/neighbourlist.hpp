@@ -14,17 +14,19 @@ inline void build_neighbour_list_naive(
     NeighbourListIndices & neighbour_indices )
 {
 
-    neighbour_indices.resize( coordinates.size() );
+    const int n_atoms = coordinates.rows();
+
+    neighbour_indices.resize( n_atoms );
 
     const double cutoff2 = cutoff * cutoff;
 
 #pragma omp parallel for
-    for( int n = 0; n < coordinates.size(); n++ )
+    for( int n = 0; n < n_atoms; n++ )
     {
         neighbour_indices[n].clear();
 
         // Loop through all water molecules again.
-        for( int m = 0; m < coordinates.size(); m++ )
+        for( int m = 0; m < n_atoms; m++ )
         {
             // Skip self-interaction in the original cell.
             if( n == m )
@@ -63,7 +65,8 @@ void iterate_neighbours(
     double cutoff, const SimulationBoxInfo & box, const Eigen::Ref<Vectorfield> coordinates,
     const NeighbourListIndices & neighbour_indices, const CallbackT & callback )
 {
-    Backend::for_each( coordinates.size(), [&]( int n ) {
+    const int n_atoms = coordinates.rows();
+    Backend::for_each( n_atoms, [&]( int n ) {
         const int n_neighbours = neighbour_indices[n].size();
 
         // Iterate over all neighbours
