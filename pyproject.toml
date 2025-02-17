@@ -1,7 +1,7 @@
 [project]
-name = "pyfixi"
+name = "pycalci"
 version = "0.0.1"
-description = "Python bindings for fixi"
+description = "Python bindings for calci"
 authors = [
     {name = "Amrita Goswami", email = "amrita16thaug646@gmail.com"},
     {name = "Moritz Sallermann", email = "moritzsallermann@gmail.com"},
