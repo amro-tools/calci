@@ -5,14 +5,10 @@ import numpy as np
 import pycalci.calcicpp as pycal
 
 
-class SCMECalculator(Calculator):
+class LennardJones(Calculator):
     implemented_properties = ["energy", "forces"]
 
-    def __init__(
-        self,
-        atoms: Atoms = None,
-        **kwargs,
-    ):
+    def __init__(self, atoms: Atoms = None, **kwargs):
         """
         Lennard-Jones calculator implementation
         Args:
@@ -21,30 +17,20 @@ class SCMECalculator(Calculator):
             n_atoms (int, optional):
                 Number of atoms. Needs to be divisible by 3.
                 Can be specified instead of n_atoms. Defaults to None.
-            unit_length (float, optional):
-                Value of the internally used length unit in angstroem.
-                The required value depends on the units of the parameters.
-                The coordinates of the atoms and the cell lengths are divided by this value
-                before they are passed to the SCME core.
-                The returned forces are divided by it too.
-                Defaults to unit.Bohr.
-            unit_energy (float, optional):
-                Value of the internally used energy unit in eV.
-                The required value depends on the units of the parameters.
-                The energy and forces returned by the SCME core are multiplied by this value.
-                Defaults to unit.Hartree.
         """
-        implemented_properties = ['energy', 'forces']
-        default_parameters = {
-        'epsilon': 1.0,
-        'sigma': 1.0,
-        'rc': None,
-        'ro': None,
-        'smooth': False,
-    }
 
-        Calculator.__init__(self)
-        
+        default_parameters = {
+            "epsilon": 1.0,
+            "sigma": 1.0,
+            "rc": None,
+            "ro": None,
+            "smooth": False,
+        }
+
+        default_parameters.update(kwargs)
+
+        Calculator.__init__(self, **default_parameters)
+
         if self.parameters.rc is None:
             self.parameters.rc = 3 * self.parameters.sigma
 
@@ -54,7 +40,12 @@ class SCMECalculator(Calculator):
         if atoms is None:
             raise Exception("Specify an Atoms object")
 
-        self.lj = pycal.LennardJones(self.parameters.sigma, self.parameters.epsilon, self.parameters.rc, self.parameters.ro)
+        self.lj = pycal.LennardJones(
+            self.parameters.sigma,
+            self.parameters.epsilon,
+            self.parameters.rc,
+            self.parameters.ro,
+        )
 
         # Read in the information from the atoms object
         if not atoms is None:
@@ -67,7 +58,7 @@ class SCMECalculator(Calculator):
         lattice = np.diagonal(np.array(atoms.get_cell()))
         pbc = np.array(atoms.get_pbc(), dtype=bool)
         box = pycal.SimulationBoxInfo(lattice, pbc)
-        self.lj.box = box  
+        self.lj.box = box
 
     def calculate(
         self,
@@ -79,7 +70,7 @@ class SCMECalculator(Calculator):
 
         self.update_system_from_atoms_object(atoms)
 
-        self.forces = np.zeros(len(atoms),3)
+        self.forces = np.zeros((len(atoms), 3))
 
         self.energy = self.lj.energy_and_forces(atoms.get_positions(), self.forces)
 
