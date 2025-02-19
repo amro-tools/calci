@@ -74,6 +74,20 @@ def test_ase_calculator():
     pos += 2e-1 * np.random.uniform(size=pos.shape)
     test_forces()
 
+    print(f"virial contribution={system.calc.results["virial"]} eV")
+    assert system.calc.results["virial"] != 0
+
+    pressure = system.calc.get_pressure(system, 85 * kB)  # in eV/Angstrom^3
+    print(f"Pressure in eV/Angstrom^3 is {pressure}")
+    NA = 6.02214076e23
+    eV_to_J = 1.60218e-19
+    ang_to_m = 1e-10
+    ang3_to_m3 = ang_to_m**3
+    eV_ang3_to_Pa = (eV_to_J / ang3_to_m3) / NA
+    Pa_to_atm = 9.86923e-6
+    pressure_atm = pressure * eV_ang3_to_Pa * Pa_to_atm
+    print(f"Pressure in atm is {pressure_atm}")
+
 
 if __name__ == "__main__":
     test_ase_calculator()

@@ -11,7 +11,23 @@ class LennardJones
 
 private:
     std::optional<Vectorfield> position_cache = std::nullopt;
+
     Scalarfield energy_buffer_atoms{};
+
+    Scalarfield virial_buffer_atoms{};
+
+    void check_buffers( int n_atoms )
+    {
+        // Make sure the energy buffer always has the same size as the positions
+        if( energy_buffer_atoms.size() != n_atoms )
+        {
+            energy_buffer_atoms.resize( n_atoms );
+        }
+        if( virial_buffer_atoms.size() != n_atoms )
+        {
+            virial_buffer_atoms.resize( n_atoms );
+        }
+    }
 
 public:
     double sigma{};
@@ -19,6 +35,7 @@ public:
     double rc{};
     double ro{};
     double verlet_skin_depth{ 0.2 };
+    double virial{};
 
     SimulationBoxInfo box{};
     NeighbourListIndices neighbour_indices{};

@@ -40,6 +40,7 @@ PYBIND11_MODULE( calcicpp, m )
         .def_readwrite( "verlet_skin_depth", &Calci::LennardJones::verlet_skin_depth )
         .def_readwrite( "box", &Calci::LennardJones::box )
         .def_readwrite( "neighbour_indices", &Calci::LennardJones::neighbour_indices )
+        .def_readonly( "virial", &Calci::LennardJones::virial )
         .def( "energy_and_forces", &Calci::LennardJones::energy_and_forces )
         .def( "recompute_neighbour_lists", &Calci::LennardJones::recompute_neighbour_lists );
 }
