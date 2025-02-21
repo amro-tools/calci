@@ -1,6 +1,8 @@
 #pragma once
 #include <array>
 #include <calci/defines.hpp>
+#include <iostream>
+#include <vector>
 
 namespace Calci
 {
@@ -54,4 +56,93 @@ public:
     }
 };
 
+inline Vector3 wrap_into_box( const Eigen::Ref<const Vector3> unwrapped_pos, const SimulationBoxInfo & box )
+{
+    Vector3 wrapped_pos    = unwrapped_pos; // initially assign the unwrapped pos
+    const auto lattice     = box.get_lattice();
+    const auto inv_lattice = box.get_inv_lattice();
+
+    for( size_t i = 0; i < 3; i++ )
+    {
+        if( box.pbc[i] ) // only wrap if pbc are active
+        {
+            double fractional_coordinate = inv_lattice[i] * unwrapped_pos[i];
+            fractional_coordinate -= std::floor( fractional_coordinate );
+            wrapped_pos( i ) = lattice[i] * fractional_coordinate;
+        }
+    }
+    return wrapped_pos;
+}
+
+inline std::pair<std::vector<Vector3>, std::vector<Vector3>>
+find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::Ref<Vectorfield> positions )
+{
+    // iterate over all atoms
+    //  ... fold them back into the box
+    //  ... check how far each atom is from the box boundary
+    //  ... if it is within rc of the box boundary, create a ghost atom
+    const int n_atoms                   = positions.rows();
+    const std::array<double, 3> lattice = box.get_lattice();
+
+    std::vector<Vector3> wrapped_positions{};
+    std::vector<Vector3> ghost_atoms{};
+
+    // the number of periodic images to test to either side in x/y/z direction
+    // if no periodic boundary conditions are active the number is zero, else it is one
+    const int nx = box.pbc[0] ? 1 : 0;
+    const int ny = box.pbc[1] ? 1 : 0;
+    const int nz = box.pbc[2] ? 1 : 0;
+
+#pragma omp parallel for
+    for( int i = 0; i < n_atoms; i++ )
+    {
+        // 1. fold back
+        const Vector3 unwrapped_pos = positions.row( i );
+        const Vector3 p             = wrap_into_box( unwrapped_pos, box );
+
+        wrapped_positions.push_back( p );
+
+        // We have to check the surrounding eight (upto) periodic images
+        // ... we address each periodic image by the translations in x, y and z direction
+        for( int ix = -nx; ix <= nx; ix++ )
+        {
+            for( int iy = -ny; iy <= ny; iy++ )
+            {
+                for( int iz = -nz; iz <= nz; iz++ )
+                {
+                    // skip the original cell
+                    if( ( ix == 0 ) && ( iy == 0 ) && ( iz == 0 ) )
+                    {
+                        continue;
+                    }
+
+                    // compute the position of the atom in the periodic image by translating with the lattice vectors
+                    const Vector3 p_img = { p[0] + ix * lattice[0], p[1] + iy * lattice[1], p[2] + iz * lattice[2] };
+
+                    // then, we check if the atom in the periodic image is within a distance of `rc` of the boundary of
+                    // the original cell
+                    bool add_ghost_atom = true;
+
+                    // loop over the components of p_img
+                    for( int ic = 0; ic < 3; ic++ )
+                    {
+                        // only add the ghost atom if all components r[ic] fulfill
+                        //    r[ic] \in [ -rc, L[ic] + rc ]
+                        const bool check_comp = p_img[ic] > -rc && p_img[ic] < lattice[ic] + rc;
+                        if( !check_comp )
+                        {
+                            add_ghost_atom = false;
+                            break;
+                        }
+                    }
+                    if( add_ghost_atom )
+                    {
+                        ghost_atoms.push_back( p_img );
+                    }
+                }
+            }
+        }
+    }
+    return { wrapped_positions, ghost_atoms };
+}
 } // namespace Calci

@@ -43,4 +43,7 @@ PYBIND11_MODULE( calcicpp, m )
         .def_readonly( "virial", &Calci::LennardJones::virial )
         .def( "energy_and_forces", &Calci::LennardJones::energy_and_forces )
         .def( "recompute_neighbour_lists", &Calci::LennardJones::recompute_neighbour_lists );
+
+
+    m.def("find_ghost_atoms", &Calci::find_ghost_atoms);
 }

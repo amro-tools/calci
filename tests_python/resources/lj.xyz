@@ -1,0 +1,5 @@
+3
+Lattice="10.0 0.0 0.0 0.0 10.0 0.0 0.0 0.0 10.0" Properties=species:S:1:pos:R:3 pbc="T T T"
+Ar     5.0      5.0    5.0 
+Ar     19.8      4.8    4.9       
+Ar     1.0      5.0    5.0      
