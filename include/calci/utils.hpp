@@ -93,54 +93,71 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
     const int ny = box.pbc[1] ? 1 : 0;
     const int nz = box.pbc[2] ? 1 : 0;
 
-#pragma omp parallel for
-    for( int i = 0; i < n_atoms; i++ )
+#pragma omp parallel
     {
-        // 1. fold back
-        const Vector3 unwrapped_pos = positions.row( i );
-        const Vector3 p             = wrap_into_box( unwrapped_pos, box );
+        // To avoid race conditions (because of std::vector::push_back) we use a private wrapped_positions vector and a
+        // privat ghost_atoms vector for each thread
+        std::vector<Vector3> wrapped_positions_thread{};
+        std::vector<Vector3> ghost_atoms_thread;
 
-        wrapped_positions.push_back( p );
-
-        // We have to check the surrounding eight (upto) periodic images
-        // ... we address each periodic image by the translations in x, y and z direction
-        for( int ix = -nx; ix <= nx; ix++ )
+#pragma omp for nowait
+        for( int i = 0; i < n_atoms; i++ )
         {
-            for( int iy = -ny; iy <= ny; iy++ )
+            // 1. fold back
+            const Vector3 unwrapped_pos = positions.row( i );
+            const Vector3 p             = wrap_into_box( unwrapped_pos, box );
+
+            wrapped_positions_thread.push_back( p );
+
+            // We have to check the surrounding eight (upto) periodic images
+            // ... we address each periodic image by the translations in x, y and z direction
+            for( int ix = -nx; ix <= nx; ix++ )
             {
-                for( int iz = -nz; iz <= nz; iz++ )
+                for( int iy = -ny; iy <= ny; iy++ )
                 {
-                    // skip the original cell
-                    if( ( ix == 0 ) && ( iy == 0 ) && ( iz == 0 ) )
+                    for( int iz = -nz; iz <= nz; iz++ )
                     {
-                        continue;
-                    }
-
-                    // compute the position of the atom in the periodic image by translating with the lattice vectors
-                    const Vector3 p_img = { p[0] + ix * lattice[0], p[1] + iy * lattice[1], p[2] + iz * lattice[2] };
-
-                    // then, we check if the atom in the periodic image is within a distance of `rc` of the boundary of
-                    // the original cell
-                    bool add_ghost_atom = true;
-
-                    // loop over the components of p_img
-                    for( int ic = 0; ic < 3; ic++ )
-                    {
-                        // only add the ghost atom if all components r[ic] fulfill
-                        //    r[ic] \in [ -rc, L[ic] + rc ]
-                        const bool check_comp = p_img[ic] > -rc && p_img[ic] < lattice[ic] + rc;
-                        if( !check_comp )
+                        // skip the original cell
+                        if( ( ix == 0 ) && ( iy == 0 ) && ( iz == 0 ) )
                         {
-                            add_ghost_atom = false;
-                            break;
+                            continue;
                         }
-                    }
-                    if( add_ghost_atom )
-                    {
-                        ghost_atoms.push_back( p_img );
+
+                        // compute the position of the atom in the periodic image by translating with the lattice vectors
+                        const Vector3 p_img
+                            = { p[0] + ix * lattice[0], p[1] + iy * lattice[1], p[2] + iz * lattice[2] };
+
+                        // then, we check if the atom in the periodic image is within a distance of `rc` of the boundary
+                        // of the original cell
+                        bool add_ghost_atom = true;
+
+                        // loop over the components of p_img
+                        for( int ic = 0; ic < 3; ic++ )
+                        {
+                            // only add the ghost atom if all components r[ic] fulfill
+                            //    r[ic] \in [ -rc, L[ic] + rc ]
+                            const bool check_comp = p_img[ic] > -rc && p_img[ic] < lattice[ic] + rc;
+                            if( !check_comp )
+                            {
+                                add_ghost_atom = false;
+                                break;
+                            }
+                        }
+                        if( add_ghost_atom )
+                        {
+                            ghost_atoms_thread.push_back( p_img );
+                        }
                     }
                 }
             }
+        }
+
+        // Combine the private wrapped_positions and ghost_atoms into the final result
+#pragma omp critical
+        {
+            wrapped_positions.insert(
+                wrapped_positions.end(), wrapped_positions_thread.begin(), wrapped_positions_thread.end() );
+            ghost_atoms.insert( ghost_atoms.end(), ghost_atoms_thread.begin(), ghost_atoms_thread.end() );
         }
     }
     return { wrapped_positions, ghost_atoms };
