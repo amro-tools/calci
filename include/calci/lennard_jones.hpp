@@ -39,6 +39,7 @@ public:
 
     SimulationBoxInfo box{};
     NeighbourListIndices neighbour_indices{};
+    NeighbourListImages neighbour_images{};
 
     LennardJones( double sigma, double epsilon, double rc, double ro )
             : sigma( sigma ), epsilon( epsilon ), rc( rc ), ro( ro )

@@ -45,7 +45,7 @@ void LennardJones::recompute_neighbour_lists( const Eigen::Ref<Vectorfield> posi
 
     if( rebuild_neighbour_list )
     {
-        Calci::build_neighbour_list_naive( cutoff, box, positions, neighbour_indices );
+        Calci::build_neighbour_list_naive( cutoff, box, positions, neighbour_indices, neighbour_images );
 
         // cache the positions after computing the neighbour lists
         position_cache = positions;

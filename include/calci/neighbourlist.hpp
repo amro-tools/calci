@@ -8,15 +8,17 @@
 namespace Calci
 {
 using NeighbourListIndices = std::vector<std::vector<int>>;
+using NeighbourListImages  = std::vector<std::vector<std::array<int, 3>>>;
 
 inline void build_neighbour_list_naive(
     double cutoff, const SimulationBoxInfo & box, const Vectorfield & coordinates,
-    NeighbourListIndices & neighbour_indices )
+    NeighbourListIndices & neighbour_indices, NeighbourListImages & neighbour_images )
 {
 
     const int n_atoms = coordinates.rows();
 
     neighbour_indices.resize( n_atoms );
+    neighbour_images.resize( n_atoms );
 
     const double cutoff2 = cutoff * cutoff;
 
@@ -24,6 +26,7 @@ inline void build_neighbour_list_naive(
     for( int n = 0; n < n_atoms; n++ )
     {
         neighbour_indices[n].clear();
+        neighbour_images[n].clear();
 
         // Loop through all water molecules again.
         for( int m = 0; m < n_atoms; m++ )
@@ -35,9 +38,9 @@ inline void build_neighbour_list_naive(
             }
 
             // Calculate coordinate difference
-            Vector3 r       = coordinates.row( n ) - coordinates.row( m );
-            r               = box.pbc_wrap( r );
-            const double R2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+            Vector3 r_unwrapped = coordinates.row( n ) - coordinates.row( m );
+            const auto [r, img] = box.pbc_wrap( r_unwrapped );
+            const double R2     = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 
             // Skip if distance greater than cutoff
             if( R2 > cutoff2 )
@@ -45,6 +48,7 @@ inline void build_neighbour_list_naive(
                 continue;
             }
 
+            neighbour_images[n].push_back( img );
             neighbour_indices[n].push_back( m );
         }
     }
@@ -75,9 +79,9 @@ void iterate_neighbours(
             // Calculate coordinate difference
             const auto & m = neighbour_indices[n][i];
 
-            Vector3 r       = coordinates.row( n ) - coordinates.row( m );
-            r               = box.pbc_wrap( r );
-            const double R2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+            Vector3 r_unwrapped = coordinates.row( n ) - coordinates.row( m );
+            const auto [r, img] = box.pbc_wrap( r_unwrapped );
+            const double R2     = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 
             if( R2 > cutoff * cutoff )
             {

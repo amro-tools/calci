@@ -39,20 +39,23 @@ public:
         return inv_lattice;
     }
 
-    inline Vector3 pbc_wrap( const Vector3 & dr, const std::array<int, 3> & shift = { 0, 0, 0 } ) const
+    inline std::pair<Vector3, std::array<int, 3>>
+    pbc_wrap( const Vector3 & dr, const std::array<int, 3> & shift = { 0, 0, 0 } ) const
     {
         Vector3 res = dr;
+        std::array<int, 3> img{};
         // Translate a coordinate by cell length if outside the box.
         for( int i = 0; i < 3; i++ )
         {
             if( pbc[i] )
             {
                 res[i] = dr[i];
-                res[i] -= nearbyint( res[i] * inv_lattice[i] ) * lattice[i];
+                img[i] = nearbyint( res[i] * inv_lattice[i] );
+                res[i] -= img[i] * lattice[i];
                 res[i] += static_cast<double>( shift[i] ) * lattice[i];
             }
         }
-        return res;
+        return { res, img };
     }
 };
 
