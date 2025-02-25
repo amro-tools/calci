@@ -77,7 +77,7 @@ inline Vector3 wrap_into_box( const Eigen::Ref<const Vector3> unwrapped_pos, con
     return wrapped_pos;
 }
 
-inline std::pair<std::vector<Vector3>, std::vector<Vector3>>
+inline std::tuple<std::vector<Vector3>, std::vector<Vector3>, std::vector<int>>
 find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::Ref<Vectorfield> positions )
 {
     // iterate over all atoms
@@ -89,6 +89,7 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
 
     std::vector<Vector3> wrapped_positions{};
     std::vector<Vector3> ghost_atoms{};
+    std::vector<int> idx_original{};
 
     // the number of periodic images to test to either side in x/y/z direction
     // if no periodic boundary conditions are active the number is zero, else it is one
@@ -99,9 +100,9 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
 #pragma omp parallel
     {
         // To avoid race conditions (because of std::vector::push_back) we use a private wrapped_positions vector and a
-        // privat ghost_atoms vector for each thread
         std::vector<Vector3> wrapped_positions_thread{};
         std::vector<Vector3> ghost_atoms_thread;
+        std::vector<int> idx_original_thread;
 
 #pragma omp for nowait
         for( int i = 0; i < n_atoms; i++ )
@@ -149,6 +150,7 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
                         if( add_ghost_atom )
                         {
                             ghost_atoms_thread.push_back( p_img );
+                            idx_original_thread.push_back( i );
                         }
                     }
                 }
@@ -161,8 +163,11 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
             wrapped_positions.insert(
                 wrapped_positions.end(), wrapped_positions_thread.begin(), wrapped_positions_thread.end() );
             ghost_atoms.insert( ghost_atoms.end(), ghost_atoms_thread.begin(), ghost_atoms_thread.end() );
+            idx_original.insert( idx_original.end(), idx_original_thread.begin(), idx_original_thread.end() );
         }
     }
-    return { wrapped_positions, ghost_atoms };
+    // return { wrapped_positions, ghost_atoms, index_map };
+    return { wrapped_positions, ghost_atoms, idx_original };
 }
+
 } // namespace Calci

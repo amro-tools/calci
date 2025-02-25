@@ -36,6 +36,7 @@ public:
     double ro{};
     double verlet_skin_depth{ 0.2 };
     double virial{};
+    double virial_general{};
 
     SimulationBoxInfo box{};
     NeighbourListIndices neighbour_indices{};
@@ -47,6 +48,8 @@ public:
     }
 
     void recompute_neighbour_lists( const Eigen::Ref<Vectorfield> positions );
+
+    Vectorfield compute_virial( const Eigen::Ref<Vectorfield> positions );
 
     double energy_and_forces( const Eigen::Ref<Vectorfield> positions, Eigen::Ref<Vectorfield> forces );
 };

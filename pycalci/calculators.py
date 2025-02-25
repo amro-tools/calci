@@ -72,11 +72,15 @@ class LennardJones(Calculator):
 
         self.forces = np.zeros((len(atoms), 3))
 
+        self.lj.recompute_neighbour_lists(atoms.get_positions())
         self.energy = self.lj.energy_and_forces(atoms.get_positions(), self.forces)
 
         self.results["energy"] = self.energy
         self.results["forces"] = self.forces
         self.results["virial"] = self.lj.virial
+
+        self.forces_all = self.lj.compute_virial(np.array(atoms.get_positions()))
+        self.results["virial_general"] = self.lj.virial_general
 
         temperature = atoms.get_temperature()
         kBT = unit.kB * temperature

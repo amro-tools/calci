@@ -52,10 +52,99 @@ void LennardJones::recompute_neighbour_lists( const Eigen::Ref<Vectorfield> posi
     }
 }
 
+Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> positions )
+{
+    // Step 1: go through neighbour list and create ghost atoms for interaction pairs, where one of the interacting
+    // atoms is in a periodic image
+
+    const auto ghost_stuff = find_ghost_atoms( rc, box, positions );
+
+    auto wrapped_positions = std::get<0>( ghost_stuff );
+    auto ghost_atoms       = std::get<1>( ghost_stuff );
+    auto idx_original      = std::get<2>( ghost_stuff );
+
+    const int n_atoms_orig  = wrapped_positions.size();
+    const int n_atoms_ghost = ghost_atoms.size();
+    const int n_atoms_all   = n_atoms_orig + n_atoms_ghost;
+
+    Vectorfield positions_all = Vectorfield( n_atoms_all, 3 );
+    Vectorfield forces_all    = Vectorfield( n_atoms_all, 3 );
+
+    Backend::for_each( n_atoms_all, [&]( int idx ) {
+        if( idx < n_atoms_orig )
+        {
+            positions_all.row( idx ) = wrapped_positions[idx];
+        }
+        else
+        {
+            positions_all.row( idx ) = ghost_atoms[idx - n_atoms_orig];
+        }
+    } );
+
+    // Compute energy and forces in the open boundary system for every point
+    const auto box_old = box;
+    box.pbc            = { false, false, false };
+
+    // Compute full neighbour list for the system with open boundary conditions and ghost atoms in a shell of rc
+    position_cache = std::nullopt;
+    recompute_neighbour_lists( positions_all );
+
+    // Generate a new full neighbour list which removes double counting for pairs straddling the boundaries of the local cell
+
+    NeighbourListIndices new_neighbour_list{};
+    new_neighbour_list.resize( n_atoms_all );
+
+#pragma omp parallel for
+    for( int idx_atom = 0; idx_atom < n_atoms_all; idx_atom++ )
+    {
+        // iterate over the original neigbhour list
+        for( auto idx_neighbour : neighbour_indices[idx_atom] )
+        {
+            // pair is between two atoms in the local cell -> take it
+            if( idx_atom < n_atoms_orig && idx_neighbour < n_atoms_orig )
+            {
+                new_neighbour_list[idx_atom].push_back( idx_neighbour );
+            }
+            else if( idx_atom < n_atoms_orig && idx_neighbour >= n_atoms_orig )
+            {
+                int idx_neighbour_orig = idx_original[idx_neighbour - n_atoms_orig];
+                // Only push this back if this is greater than idx_atom
+                if( idx_neighbour_orig > idx_atom )
+                {
+                    new_neighbour_list[idx_atom].push_back( idx_neighbour );
+                }
+            }
+            else if( idx_atom >= n_atoms_orig && idx_neighbour < n_atoms_orig )
+            {
+                int idx_atom_orig = idx_original[idx_atom - n_atoms_orig];
+                // Only push this back if this is greater than idx_atom
+                if( idx_neighbour < idx_atom_orig )
+                {
+                    new_neighbour_list[idx_atom].push_back( idx_neighbour );
+                }
+            }
+        }
+    }
+
+    // Overwrite the neighbour list with our new neighbour list
+    neighbour_indices = new_neighbour_list;
+
+    // Compute virial and profit
+    energy_and_forces( positions_all, forces_all );
+
+    virial_general = Backend::transform_reduce_sum<double>( n_atoms_all, [&]( int idx ) {
+        const double t = positions_all.row( idx ).dot( forces_all.row( idx ) );
+        return t;
+    } );
+
+    position_cache = std::nullopt;
+    box            = box_old;
+
+    return forces_all;
+} // namespace Calci
+
 double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions, Eigen::Ref<Vectorfield> forces )
 {
-    recompute_neighbour_lists( positions );
-
     const int n_atoms = positions.rows();
 
     check_buffers( n_atoms );
