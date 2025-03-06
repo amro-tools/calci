@@ -77,31 +77,7 @@ class LennardJones(Calculator):
 
         self.results["energy"] = self.energy
         self.results["forces"] = self.forces
-        self.results["virial"] = self.lj.virial
 
         self.forces_all = self.lj.compute_virial(np.array(atoms.get_positions()))
-        self.results["virial_general"] = self.lj.virial_general
-
-        temperature = atoms.get_temperature()
-        kBT = unit.kB * temperature
-        pressure = self.get_pressure(atoms, kBT)
-
-        self.results["pressure"] = pressure  # in eV/A^3
-
-    def get_pressure(self, atoms, kBT, ndims=3):
-        """ "
-        params:
-            atoms : the atoms object
-            kBT : k_B * T in units of eV (should be consistent with the energy in the calculator, usually eV)
-            ndims : dimensionality of the system (default 3)
-        returns:
-            pressure in eV/Angstrom^3
-        """
-
-        volume = atoms.get_volume()
-        dof = atoms.get_number_of_degrees_of_freedom()
-
-        pressure = (dof / ndims) * kBT / (volume) + 1.0 / (
-            volume * ndims
-        ) * self.results["virial"]
-        return pressure
+        self.results["virial"] = self.lj.virial_general
+        self.results["virial_pairwise"] = self.lj.virial
