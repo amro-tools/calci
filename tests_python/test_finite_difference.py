@@ -26,14 +26,19 @@ def test_finite_difference():
 
     box = SimulationBoxInfo()
     box.pbc = [True, False, False]
+    box.set_lattice(np.array([5.0, 5.0, 5.0]))
     LJ = LennardJones(sigma, epsilon, rc, ro)
     LJ.box = box
 
     def energy_and_force(positions):
-        energy = LJ.energy_and_forces(np.array(positions), forces)
+        positions = np.array(positions)
+        forces = np.zeros(positions.shape)
+        LJ.recompute_neighbour_lists(positions)
+        energy = LJ.energy_and_forces(positions, forces)
         return energy, forces
 
-    energy_lj, force_lj = energy_and_force(positions)
+    LJ.recompute_neighbour_lists(np.array(positions))
+    energy_lj, force_lj = energy_and_force(np.array(positions))
     force_fd = -finite_difference(
         lambda pos: energy_and_force(pos)[0], x=positions, epsilon=1e-8
     )
