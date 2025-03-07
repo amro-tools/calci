@@ -98,7 +98,7 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
         // To avoid race conditions (because of std::vector::push_back) we use a private wrapped_positions vector and a
         // privat ghost_atoms vector for each thread
         std::vector<Vector3> wrapped_positions_thread{};
-        std::vector<Vector3> ghost_atoms_thread;
+        std::vector<Vector3> ghost_atoms_thread{};
 
 #pragma omp for nowait
         for( int i = 0; i < n_atoms; i++ )
