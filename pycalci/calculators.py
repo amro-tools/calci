@@ -40,12 +40,22 @@ class LennardJones(Calculator):
         if atoms is None:
             raise Exception("Specify an Atoms object")
 
-        self.lj = pycal.LennardJones(
-            self.parameters.sigma,
-            self.parameters.epsilon,
-            self.parameters.rc,
-            self.parameters.ro,
-        )
+        if "type_ids" in kwargs and "parameter_map" in kwargs:
+            self.lj = pycal.LennardJones(
+                self.parameters.sigma,
+                self.parameters.epsilon,
+                self.parameters.rc,
+                self.parameters.ro,
+                kwargs["type_ids"],
+                kwargs["parameter_map"],
+            )
+        else:
+            self.lj = pycal.LennardJones(
+                self.parameters.sigma,
+                self.parameters.epsilon,
+                self.parameters.rc,
+                self.parameters.ro,
+            )
 
         # Read in the information from the atoms object
         if not atoms is None:

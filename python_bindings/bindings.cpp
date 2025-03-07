@@ -33,6 +33,7 @@ PYBIND11_MODULE( calcicpp, m )
 
     py::class_<Calci::LennardJones>( m, "LennardJones" )
         .def( py::init<double, double, double, double>() )
+        .def( py::init<double, double, double, double, const std::vector<int> &, const Calci::ParameterLookupMap &>() )
         .def_readwrite( "sigma", &Calci::LennardJones::sigma )
         .def_readwrite( "epsilon", &Calci::LennardJones::epsilon )
         .def_readwrite( "rc", &Calci::LennardJones::rc )

@@ -2,6 +2,8 @@
 #include <array>
 #include <calci/defines.hpp>
 #include <iostream>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace Calci
@@ -170,5 +172,20 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
     // return { wrapped_positions, ghost_atoms, index_map };
     return { wrapped_positions, ghost_atoms, idx_original };
 }
+
+// Custom hash function for std::pair
+struct pair_commutative_hash
+{
+    template<typename T1, typename T2>
+    std::size_t operator()( const std::pair<T1, T2> & p ) const
+    {
+        std::size_t hash1 = std::hash<T1>{}( p.first );
+        std::size_t hash2 = std::hash<T2>{}( p.second );
+        // Addition is commutative: hash(a, b) == hash(b, a)
+        return hash1 + hash2;
+    }
+};
+
+using ParameterLookupMap = std::unordered_map<std::pair<int, int>, std::pair<double, double>, pair_commutative_hash>;
 
 } // namespace Calci

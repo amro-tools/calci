@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def finite_difference(func, x: np.ndarray, epsilon: float = 1e-7) -> np.ndarray:
     """Compute the derivative of `func` wrt to x.
 

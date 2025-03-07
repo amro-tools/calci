@@ -36,7 +36,6 @@ def test_ghost_atoms():
     print(f"{ghost_atoms = }")
     print(f"{idx_original = }")
 
-
     # Expected wrapped positions
     wrapped_positions_exp = np.array(
         [[5.0, 5.0, 5.0], [9.8, 4.8, 4.9], [1.0, 5.0, 5.0]]
@@ -80,7 +79,9 @@ def test_ghost_atoms_fcc():
 
     original_pos = np.array(system.positions)
 
-    wrapped_positions, ghost_atoms, idx_original = find_ghost_atoms(rc, box, original_pos)
+    wrapped_positions, ghost_atoms, idx_original = find_ghost_atoms(
+        rc, box, original_pos
+    )
 
     n_ghost_atoms_calci = len(ghost_atoms)
     print(f"{n_ghost_atoms_calci = }")

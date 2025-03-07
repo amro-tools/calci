@@ -2,6 +2,7 @@
 #include <calci/defines.hpp>
 #include <calci/lennard_jones.hpp>
 #include <calci/neighbourlist.hpp>
+#include <stdexcept>
 
 namespace Calci
 {
@@ -157,8 +158,26 @@ double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions,
     } );
 
     iterate_neighbours( rc, box, positions, neighbour_indices, [&]( int n, int m, const Vector3 & r ) {
-        const double R         = r.norm();
-        const double R2        = R * R;
+        const double R  = r.norm();
+        const double R2 = R * R;
+
+        // fetch the "default" sigma and epsilon
+        double epsilon = this->epsilon;
+        double sigma   = this->sigma;
+
+        if( type_ids.has_value() && parameter_map.has_value() )
+        {
+            const int type_n = type_ids.value()[n];
+            const int type_m = type_ids.value()[m];
+            // if the interaction is contained in the parameter map, overwrite sigma and epsilon by the value in the
+            // parameter map
+            if( parameter_map->contains( { type_n, type_m } ) )
+            {
+                epsilon = parameter_map.value()[{ type_n, type_m }].first;
+                sigma   = parameter_map.value()[{ type_n, type_m }].second;
+            }
+        }
+
         const double sigma_R   = sigma / R;
         const double sigma_R_2 = sigma_R * sigma_R;
         const double sigma_R_4 = sigma_R_2 * sigma_R_2;

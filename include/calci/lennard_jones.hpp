@@ -3,6 +3,7 @@
 #include "calci/utils.hpp"
 #include <calci/defines.hpp>
 #include <optional>
+#include <unordered_map>
 
 namespace Calci
 {
@@ -27,16 +28,24 @@ private:
         {
             virial_buffer_atoms.resize( n_atoms );
         }
+        if( type_ids.has_value() && static_cast<int>( type_ids->size() ) != n_atoms )
+        {
+            throw std::runtime_error( "type_ids does not have the same size as positions" );
+        }
     }
 
 public:
     double sigma{};
     double epsilon{};
+
     double rc{};
     double ro{};
     double verlet_skin_depth{ 0.2 };
     double virial{};
     double virial_general{};
+
+    std::optional<std::vector<int>> type_ids        = std::nullopt;
+    std::optional<ParameterLookupMap> parameter_map = std::nullopt;
 
     SimulationBoxInfo box{};
     NeighbourListIndices neighbour_indices{};
@@ -45,6 +54,15 @@ public:
     LennardJones( double sigma, double epsilon, double rc, double ro )
             : sigma( sigma ), epsilon( epsilon ), rc( rc ), ro( ro )
     {
+    }
+
+    LennardJones(
+        double sigma, double epsilon, double rc, double ro, const std::vector<int> & type_ids,
+        const ParameterLookupMap & parameter_map )
+            : LennardJones( sigma, epsilon, rc, ro )
+    {
+        this->type_ids      = type_ids;
+        this->parameter_map = parameter_map;
     }
 
     void recompute_neighbour_lists( const Eigen::Ref<Vectorfield> positions );
