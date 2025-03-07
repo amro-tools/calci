@@ -36,9 +36,11 @@ public:
     double ro{};
     double verlet_skin_depth{ 0.2 };
     double virial{};
+    double virial_general{};
 
     SimulationBoxInfo box{};
     NeighbourListIndices neighbour_indices{};
+    NeighbourListImages neighbour_images{};
 
     LennardJones( double sigma, double epsilon, double rc, double ro )
             : sigma( sigma ), epsilon( epsilon ), rc( rc ), ro( ro )
@@ -46,6 +48,8 @@ public:
     }
 
     void recompute_neighbour_lists( const Eigen::Ref<Vectorfield> positions );
+
+    Vectorfield compute_virial( const Eigen::Ref<Vectorfield> positions );
 
     double energy_and_forces( const Eigen::Ref<Vectorfield> positions, Eigen::Ref<Vectorfield> forces );
 };
