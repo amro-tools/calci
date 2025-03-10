@@ -3,6 +3,7 @@
 #include <calci/lennard_jones.hpp>
 #include <calci/neighbourlist.hpp>
 #include <stdexcept>
+#include <vector>
 
 namespace Calci
 {
@@ -70,8 +71,22 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
 
     Vectorfield positions_all = Vectorfield( n_atoms_all, 3 );
     Vectorfield forces_all    = Vectorfield( n_atoms_all, 3 );
+    auto type_ids_all         = std::vector<int>( n_atoms_all, 0 );
+    auto type_ids_original    = std::vector<int>{};
+    // Create type_ids initialized to zero if the user hasn't entered anything
+    if( type_ids.has_value() )
+    {
+        type_ids_original = type_ids.value();
+    }
+    else
+    {
+        type_ids_original = std::vector<int>( n_atoms_orig, 0 );
+    }
 
-    Backend::for_each( n_atoms_all, [&]( int idx ) {
+    Backend::for_each(
+        n_atoms_all,
+        [&]( int idx )
+        {
         if( idx < n_atoms_orig )
         {
             positions_all.row( idx ) = wrapped_positions[idx];
@@ -79,6 +94,8 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
         else
         {
             positions_all.row( idx ) = ghost_atoms[idx - n_atoms_orig];
+                // Add the type ID for the ghost atom using the original index
+                type_ids_all[idx] = type_ids_original[idx_original[idx - n_atoms_orig]];
         }
     } );
 
@@ -129,20 +146,38 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
 
     // Overwrite the neighbour list with our new neighbour list
     neighbour_indices = new_neighbour_list;
+    // Overwrite the type ids
+    if( type_ids.has_value() )
+    {
+        type_ids = type_ids_all;
+    }
 
     // Compute virial and profit
     energy_and_forces( positions_all, forces_all );
 
-    virial_general = Backend::transform_reduce_sum<double>( n_atoms_all, [&]( int idx ) {
+    virial_general = Backend::transform_reduce_sum<double>(
+        n_atoms_all,
+        [&]( int idx )
+        {
         const double t = positions_all.row( idx ).dot( forces_all.row( idx ) );
         return t;
     } );
 
     position_cache = std::nullopt;
     box            = box_old;
+    // Reset to old type_ids
+    if( type_ids.has_value() )
+    {
+        type_ids = type_ids_original;
+    }
 
     return forces_all;
 } // namespace Calci
+
+void debug_print(int n, int m, int type_n, int type_m, double epsilon, double sigma, double R)
+{
+    std::cout << "===\nn = " << n << ", m = " << m << ", type_n = " << type_n << ", type_m = " << type_m << ", R = " << R << ", epsilon = " << epsilon << ", sigma = " << sigma << "\n";
+}
 
 double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions, Eigen::Ref<Vectorfield> forces )
 {
@@ -151,13 +186,19 @@ double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions,
     check_buffers( n_atoms );
 
     // zero out the forces and energy buffer
-    Backend::for_each( n_atoms, [&]( int i ) {
+    Backend::for_each(
+        n_atoms,
+        [&]( int i )
+        {
         forces.row( i )        = Vector3::Zero();
         energy_buffer_atoms[i] = 0.0;
         virial_buffer_atoms[i] = 0.0;
     } );
 
-    iterate_neighbours( rc, box, positions, neighbour_indices, [&]( int n, int m, const Vector3 & r ) {
+    iterate_neighbours(
+        rc, box, positions, neighbour_indices,
+        [&]( int n, int m, const Vector3 & r )
+        {
         const double R  = r.norm();
         const double R2 = R * R;
 

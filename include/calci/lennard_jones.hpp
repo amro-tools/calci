@@ -30,7 +30,9 @@ private:
         }
         if( type_ids.has_value() && static_cast<int>( type_ids->size() ) != n_atoms )
         {
-            throw std::runtime_error( "type_ids does not have the same size as positions" );
+            throw std::runtime_error(
+                "Mismatch: type_ids has size " + std::to_string( type_ids->size() ) + " but the number of atoms inferred is "
+                + std::to_string( n_atoms ) );
         }
     }
 

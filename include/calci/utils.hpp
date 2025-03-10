@@ -186,6 +186,16 @@ struct pair_commutative_hash
     }
 };
 
-using ParameterLookupMap = std::unordered_map<std::pair<int, int>, std::pair<double, double>, pair_commutative_hash>;
+// Custom equality comparator: treats (a, b) and (b, a) as equal.
+struct pair_commutative_equal {
+    template<typename T1, typename T2>
+    bool operator()(const std::pair<T1, T2>& lhs, const std::pair<T1, T2>& rhs) const {
+        return (lhs.first == rhs.first && lhs.second == rhs.second) ||
+               (lhs.first == rhs.second && lhs.second == rhs.first);
+    }
+};
+
+
+using ParameterLookupMap = std::unordered_map<std::pair<int, int>, std::pair<double, double>, pair_commutative_hash, pair_commutative_equal>;
 
 } // namespace Calci

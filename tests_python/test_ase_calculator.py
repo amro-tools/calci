@@ -78,8 +78,8 @@ def test_ase_calculator():
     assert system.calc.results["virial"] != 0
 
 
-def test_ase_calculator_parameter_map():
-    input_file_path = Path(__file__).parent / "resources/system.xyz"
+def test_ase_calculator_parameter_map_small():
+    input_file_path = Path(__file__).parent / "resources/lj.xyz"
 
     # Read the system using ASE
     with open(input_file_path, "r") as f:
@@ -91,15 +91,17 @@ def test_ase_calculator_parameter_map():
 
     type_ids = np.zeros(n_atoms, dtype=int)
 
-    type_ids[1] = 1
+    type_ids[0] = 1
     parameter_map = {(0, 1): (0.0, 1.0)}
 
+    # rc should be 4.1 for this system
+    para_dict["rc"] = 4.1
     system.calc = LennardJones(
-        atoms=system, type_ids=type_ids, parameter_map=parameter_map, **para_dict
+        atoms=system, **para_dict, parameter_map=parameter_map, type_ids=type_ids
     )
 
     # Check that everything was read in
-    assert len(system) == 48
+    assert len(system) == 3
 
     assert np.all(
         np.isclose(
@@ -131,10 +133,15 @@ def test_ase_calculator_parameter_map():
         print(f"{max_force_diff = }")
 
         assert np.all(np.isclose(forces_fd, forces_ase, atol=1e-7))
+        return forces_ase, forces_fd
 
     # test forces for different random displacements as well
 
-    test_forces()
+    forces_ase, forces_fd = test_forces()
+    print(f"{forces_ase=}")
+    print(f"{forces_fd=}")
+    forces_ase_expected = np.zeros(3)
+    assert np.all(np.isclose(forces_ase[0], forces_ase_expected))
     pos += 1e-2 * np.random.uniform(size=pos.shape)
     test_forces()
     pos += 1e-1 * np.random.uniform(size=pos.shape)
@@ -142,9 +149,10 @@ def test_ase_calculator_parameter_map():
     pos += 2e-1 * np.random.uniform(size=pos.shape)
     test_forces()
 
-    print(f"virial contribution={system.calc.results["virial"]} eV")
+    print(f"virial contribution from potential={system.calc.results["virial"]} eV")
     assert system.calc.results["virial"] != 0
 
 
 if __name__ == "__main__":
     test_ase_calculator()
+    test_ase_calculator_parameter_map_small()
