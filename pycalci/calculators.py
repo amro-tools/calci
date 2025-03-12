@@ -87,7 +87,7 @@ class LennardJones(Calculator):
 
         self.results["energy"] = self.energy
         self.results["forces"] = self.forces
+        self.results["virial_pairwise"] = self.lj.virial
 
         self.forces_all = self.lj.compute_virial(np.array(atoms.get_positions()))
         self.results["virial"] = self.lj.virial_general
-        self.results["virial_pairwise"] = self.lj.virial
