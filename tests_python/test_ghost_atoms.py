@@ -100,7 +100,10 @@ def test_ghost_atoms_fcc():
 
     n_ghost_atoms_np = np.sum(mask1) - len(original_pos)
 
+    print(f"{len(idx_original) = }")
     print(f"{n_ghost_atoms_np = }")
+
+    assert n_ghost_atoms_np == n_ghost_atoms_np
 
 
 if __name__ == "__main__":

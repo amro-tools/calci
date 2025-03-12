@@ -99,22 +99,28 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
     const int ny = box.pbc[1] ? 1 : 0;
     const int nz = box.pbc[2] ? 1 : 0;
 
+    wrapped_positions.resize(n_atoms);
+
+    // Generate wrapped positions (in the same order as the original positions)
+    #pragma omp parallel for
+    for(int idx_atom=0; idx_atom<n_atoms; idx_atom++)
+    {
+        const Vector3 unwrapped_pos = positions.row( idx_atom );
+        const Vector3 p             = wrap_into_box( unwrapped_pos, box );
+        wrapped_positions[idx_atom] = p;
+    }
+
 #pragma omp parallel
     {
         // To avoid race conditions (because of std::vector::push_back) we use a private wrapped_positions vector and a
         std::vector<Vector3> wrapped_positions_thread{};
-
-        std::vector<Vector3> ghost_atoms_thread;
+        std::vector<Vector3> ghost_atoms_thread{};
         std::vector<int> idx_original_thread{};
 
 #pragma omp for nowait
         for( int i = 0; i < n_atoms; i++ )
         {
-            // 1. fold back
-            const Vector3 unwrapped_pos = positions.row( i );
-            const Vector3 p             = wrap_into_box( unwrapped_pos, box );
-
-            wrapped_positions_thread.push_back( p );
+            const Vector3 p = wrapped_positions[i];
 
             // We have to check the surrounding eight (upto) periodic images
             // ... we address each periodic image by the translations in x, y and z direction
@@ -169,7 +175,7 @@ find_ghost_atoms( const double rc, const SimulationBoxInfo & box, const Eigen::R
             idx_original.insert( idx_original.end(), idx_original_thread.begin(), idx_original_thread.end() );
         }
     }
-    // return { wrapped_positions, ghost_atoms, index_map };
+
     return { wrapped_positions, ghost_atoms, idx_original };
 }
 

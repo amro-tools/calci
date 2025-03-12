@@ -94,8 +94,8 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
         else
         {
             positions_all.row( idx ) = ghost_atoms[idx - n_atoms_orig];
-                // Add the type ID for the ghost atom using the original index
-                type_ids_all[idx] = type_ids_original[idx_original[idx - n_atoms_orig]];
+            // Add the type ID for the ghost atom using the original index
+            type_ids_all[idx] = type_ids_original[idx_original[idx - n_atoms_orig]];
         }
     } );
 

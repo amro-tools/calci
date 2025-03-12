@@ -1,7 +1,6 @@
 from util import finite_difference
-from ase.io import read, write
+from ase.io import read
 from ase.units import fs
-from ase.md.verlet import VelocityVerlet
 from ase.optimize.fire2 import FIRE2
 import numpy as np
 from pathlib import Path
@@ -21,8 +20,25 @@ para_dict = {
 }
 
 
+def calculate_virial(atoms, general : bool = False):
+    try:
+        # Virial from the potential
+        if general:
+            if "virial_general" in atoms.calc.results:
+                potential_virial = atoms.calc.results["virial_general"]
+            else:
+                potential_virial = atoms.calc.results["virial"]
+        else:
+            potential_virial = atoms.calc.results["virial_pairwise"]
+
+        total_virial = potential_virial
+    except:
+        total_virial = float("nan")
+    return total_virial
+
+
 def test_ase_calculator():
-    input_file_path = Path(__file__).parent / "resources/fcc_small.xyz"
+    input_file_path = Path(__file__).parent / "resources/fcc_min.xyz"
 
     # Read the system using ASE
     with open(input_file_path, "r") as f:
@@ -63,6 +79,17 @@ def test_ase_calculator():
 
     def test_forces_and_virial():
         energy_ase, forces_ase = get_energy_and_forces_ase(pos)
+
+        virial_pairwise = calculate_virial(system, general=False)# system.calc.results["virial_pairwise"]
+        print(f"virial (pairwise) contribution={virial_pairwise} eV")
+
+        # Check that the virial matches with pairwise virial
+        virial_general = calculate_virial(system, general=True)
+        print(f"virial contribution using general formulation={virial_general} eV")
+        print(f" {virial_pairwise / virial_general = } ")
+
+        assert np.isclose(virial_general, virial_pairwise)
+
         forces_fd = -finite_difference(
             lambda p: get_energy_and_forces_ase(p)[0], pos, epsilon=1e-7
         )
@@ -73,16 +100,6 @@ def test_ase_calculator():
 
         assert np.all(np.isclose(forces_fd, forces_ase, atol=1e-7))
 
-        virial_pairwise = system.calc.results["virial_pairwise"]
-        print(f"virial (pairwise) contribution={virial_pairwise} eV")
-
-        # Check that the virial matches with pairwise virial
-        virial_general = system.calc.results["virial"]
-        print(f"virial contribution using general formulation={virial_general} eV")
-        print(f" {virial_pairwise / virial_general = } ")
-
-        assert np.isclose(virial_general, virial_pairwise)
-
         return energy_ase, forces_ase
 
     test_forces_and_virial()
@@ -91,6 +108,19 @@ def test_ase_calculator():
     pos += 1e-2 * np.random.uniform(size=pos.shape)
     test_forces_and_virial()
     pos += 2e-2 * np.random.uniform(size=pos.shape)
+    test_forces_and_virial()
+
+    dyn = FIRE2(system, dt=1.0)
+    dyn.run()
+
+    virial_pairwise = system.calc.results["virial_pairwise"]
+    print(f"virial (pairwise) contribution={virial_pairwise} eV")
+
+    # Check that the virial matches with pairwise virial
+    virial_general = system.calc.results["virial"]
+    print(f"virial contribution using general formulation={virial_general} eV")
+    print(f" {virial_pairwise / virial_general = } ")
+
     test_forces_and_virial()
 
 if __name__ == "__main__":
