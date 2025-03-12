@@ -58,7 +58,6 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
 {
     // Step 1: go through neighbour list and create ghost atoms for interaction pairs, where one of the interacting
     // atoms is in a periodic image
-
     const auto ghost_stuff = find_ghost_atoms( rc, box, positions );
 
     auto wrapped_positions = std::get<0>( ghost_stuff );
@@ -73,6 +72,7 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
     Vectorfield forces_all    = Vectorfield( n_atoms_all, 3 );
     auto type_ids_all         = std::vector<int>( n_atoms_all, 0 );
     auto type_ids_original    = std::vector<int>{};
+
     // Create type_ids initialized to zero if the user hasn't entered anything
     if( type_ids.has_value() )
     {
@@ -108,7 +108,6 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
     recompute_neighbour_lists( positions_all );
 
     // Generate a new full neighbour list which removes double counting for pairs straddling the boundaries of the local cell
-
     NeighbourListIndices new_neighbour_list{};
     new_neighbour_list.resize( n_atoms_all );
 
