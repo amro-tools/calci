@@ -89,7 +89,7 @@ def test_ghost_atoms_fcc():
     system = system.repeat([3, 3, 3])
     system.center()
 
-    write("fcc_rep.xyz", system)
+    # write("fcc_rep.xyz", system)
 
     new_pos = np.array(system.positions)
 
