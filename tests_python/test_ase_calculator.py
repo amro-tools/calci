@@ -64,7 +64,7 @@ def run_test_ase_calculator(system):
         print(f"virial contribution using general formulation={virial_general} eV")
         print(f" {virial_pairwise / virial_general = } ")
 
-        # assert np.isclose(virial_general, virial_pairwise)
+        assert np.isclose(virial_general, virial_pairwise)
 
         forces_fd = -finite_difference(
             lambda p: get_energy_and_forces_ase(p)[0], pos, epsilon=1e-7
@@ -95,12 +95,12 @@ def run_test_ase_calculator(system):
     # Check that the virial matches with pairwise virial
     virial_general = system.calc.results["virial"]
     print(f"virial contribution using general formulation={virial_general} eV")
-    print(f" {virial_pairwise / virial_general = } ")
+    print(f"{virial_pairwise / virial_general = } ")
 
     test_forces_and_virial()
 
 def test_ase_calculator_LJ_argon(LJ_liquid_argon):
     run_test_ase_calculator(LJ_liquid_argon)
 
-# def test_ase_calculator_LJ_argon_with_H(LJ_liquid_argon_with_H_satellites):
-#     run_test_ase_calculator(LJ_liquid_argon_with_H_satellites)
+def test_ase_calculator_LJ_argon_with_H(LJ_liquid_argon_with_H_satellites):
+    run_test_ase_calculator(LJ_liquid_argon_with_H_satellites)
