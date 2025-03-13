@@ -37,7 +37,6 @@ def test_finite_difference():
         energy = LJ.energy_and_forces(positions, forces)
         return energy, forces
 
-    LJ.recompute_neighbour_lists(np.array(positions))
     energy_lj, force_lj = energy_and_force(np.array(positions))
     force_fd = -finite_difference(
         lambda pos: energy_and_force(pos)[0], x=positions, epsilon=1e-8
