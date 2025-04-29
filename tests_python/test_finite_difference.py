@@ -26,7 +26,7 @@ def test_finite_difference():
 
     box = SimulationBoxInfo()
     box.pbc = [True, False, False]
-    box.set_lattice(np.array([5.0, 5.0, 5.0]))
+    box.set_lattice(np.array([20.0, 5.0, 5.0]))
     LJ = LennardJones(sigma, epsilon, rc, ro)
     LJ.box = box
 
