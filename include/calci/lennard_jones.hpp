@@ -3,7 +3,7 @@
 #include "calci/utils.hpp"
 #include <calci/defines.hpp>
 #include <optional>
-#include <unordered_map>
+#include <stdexcept>
 
 namespace Calci
 {
@@ -31,8 +31,22 @@ private:
         if( type_ids.has_value() && static_cast<int>( type_ids->size() ) != n_atoms )
         {
             throw std::runtime_error(
-                "Mismatch: type_ids has size " + std::to_string( type_ids->size() ) + " but the number of atoms inferred is "
-                + std::to_string( n_atoms ) );
+                "Mismatch: type_ids has size " + std::to_string( type_ids->size() )
+                + " but the number of atoms inferred is " + std::to_string( n_atoms ) );
+        }
+
+        const auto L   = box.get_lattice();
+        const auto pbc = box.pbc;
+        for( int i = 0; i < 3; i++ )
+        {
+            if( pbc[i] )
+            {
+                if( rc > 0.5 * L[i] )
+                {
+                    throw std::runtime_error(
+                        "Rc is too large. In periodic directions, it cannot be larger than half the box size." );
+                }
+            }
         }
     }
 
