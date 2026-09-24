@@ -23,6 +23,15 @@ inline int get_num_threads()
     return 1;
 }
 
+inline int get_thread_num()
+{
+#ifdef _OPENMP
+    return omp_get_thread_num();
+#else
+    return 0;
+#endif
+}
+
 template<typename CallbackT>
 void for_each( int n_elements, const CallbackT & callback )
 {

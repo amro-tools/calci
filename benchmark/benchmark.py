@@ -1,8 +1,10 @@
 import numpy as np
 import time
 
+from ase import Atoms
+from ase.calculators.lj import LennardJones as ASELennardJones
 import pycalci
-from pycalci import LennardJones, SimulationBoxInfo
+from pycalci import LennardJones as CalciLennardJones, SimulationBoxInfo
 
 
 def benchmark():
@@ -10,11 +12,11 @@ def benchmark():
     a, b, c = 16, 16, 16
 
     N_FORCECALLS = 100
-    THREADS_LIST = range(1,65)
+    THREADS_LIST = range(1,11)
 
     SIGMA = 1.0
     EPSILON = 1.0
-    RC = 10.0
+    RC = 3.0
     RO = 10.0
     PBC = [True, True, True]
     BOXDIMS = [a+5, b+5, c+5]
@@ -28,34 +30,61 @@ def benchmark():
 
     positions = np.array(positions)
     # add some noise
-    positions += 0.001 * np.random.uniform(size=positions.shape)
+    rng = np.random.default_rng(0)
+    positions += 0.001 * rng.uniform(size=positions.shape)
 
     forces = np.zeros(positions.shape)
 
     box = SimulationBoxInfo()
     box.set_lattice(BOXDIMS)
     box.pbc = PBC
-    LJ = LennardJones(SIGMA, EPSILON, RC, RO)
-    LJ.box = box
+    calci_lj = CalciLennardJones(SIGMA, EPSILON, RC, RO)
+    calci_lj.box = box
+    calci_lj.recompute_neighbour_lists(positions)
 
-    def energy_and_force(positions):
-        energy = LJ.energy_and_forces(np.array(positions), forces)
+    def calci_energy_and_forces():
+        calci_lj.recompute_neighbour_lists(positions)
+        energy = calci_lj.energy_and_forces(positions, forces)
         return energy, forces
 
+    ase_atoms = Atoms(positions=positions, numbers=np.full(len(positions), 18))
+    ase_atoms.set_cell(BOXDIMS)
+    ase_atoms.set_pbc(PBC)
+    ase_lj = ASELennardJones(
+        sigma=SIGMA, epsilon=EPSILON, rc=RC, ro=RO, smooth=False
+    )
 
-    time_list = []
+    def ase_energy_and_forces():
+        # Calling calculate directly avoids ASE returning cached results.
+        ase_lj.calculate(ase_atoms)
+        return ase_lj.results["energy"], ase_lj.results["forces"]
+
+    calci_energy_and_forces()
+    ase_energy_and_forces()
+
+    print("Testing ASE baseline")
+    t_start = time.perf_counter()
+    for _ in range(N_FORCECALLS):
+        ase_energy_and_forces()
+    ase_time = time.perf_counter() - t_start
+
+    calci_times = []
 
     for threads in THREADS_LIST:
         pycalci.set_num_threads(threads)
         print(f"Testing with {threads} threads")
-        t_start = time.time()
+        t_start = time.perf_counter()
         for _ in range(N_FORCECALLS):
-            energy_lj, force_lj = energy_and_force(positions)
-        t_end = time.time()
+            calci_energy_and_forces()
+        calci_times.append(time.perf_counter() - t_start)
 
-        time_list.append(t_end - t_start)
-
-    np.savetxt("timings.txt", np.vstack( [THREADS_LIST, time_list] ).T )
+    np.savetxt(
+        "timings.txt",
+        np.column_stack(
+            [THREADS_LIST, calci_times, np.full(len(calci_times), ase_time)]
+        ),
+        header="threads calci_seconds ase_seconds",
+    )
 
 
 if __name__ == "__main__":

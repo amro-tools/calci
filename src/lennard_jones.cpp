@@ -28,11 +28,11 @@ void LennardJones::recompute_neighbour_lists( const Eigen::Ref<Vectorfield> posi
         // last neighbourlist update
 
         // clang-format off
-        const double max_move = Backend::transform_reduce<double>(
-            positions.size(), 
+        const double max_move_squared = Backend::transform_reduce<double>(
+            positions.rows(),
             [&]( int n ) 
             {
-                return ( position_cache.value().row( n ) - positions.row( n ) ).norm(); 
+                return ( position_cache.value().row( n ) - positions.row( n ) ).squaredNorm();
             },
             []( double & lhs, const double & rhs ) 
             {
@@ -42,12 +42,13 @@ void LennardJones::recompute_neighbour_lists( const Eigen::Ref<Vectorfield> posi
         // clang-format on
 
         // we need to rebuild if any position changed by more than half the skin depth
-        rebuild_neighbour_list = max_move > 0.5 * rc * verlet_skin_depth;
+        const double rebuild_distance = 0.5 * rc * verlet_skin_depth;
+        rebuild_neighbour_list = max_move_squared > rebuild_distance * rebuild_distance;
     }
 
     if( rebuild_neighbour_list )
     {
-        Calci::build_neighbour_list_naive( cutoff, box, positions, neighbour_indices, neighbour_images );
+        Calci::build_neighbour_list( cutoff, box, positions, neighbour_indices, neighbour_images );
 
         // cache the positions after computing the neighbour lists
         position_cache = positions;
@@ -104,11 +105,12 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
     const auto box_old = box;
     box.pbc            = { false, false, false };
 
-    // Compute full neighbour list for the system with open boundary conditions and ghost atoms in a shell of rc
+    // Build a half neighbour list for the open system, including the periodic ghost shell.
     position_cache = std::nullopt;
     recompute_neighbour_lists( positions_all );
 
-    // Generate a new full neighbour list which removes double counting for pairs straddling the boundaries of the local cell
+    // Keep exactly one representative of each pair that crosses the original cell boundary;
+    // energy_and_forces() relies on every physical pair appearing only once.
     NeighbourListIndices new_neighbour_list{};
     new_neighbour_list.resize( n_atoms_all );
 
@@ -172,64 +174,77 @@ Vectorfield LennardJones::compute_virial( const Eigen::Ref<Vectorfield> position
 double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions, Eigen::Ref<Vectorfield> forces )
 {
     const int n_atoms = positions.rows();
+    const double cutoff2 = rc * rc;
 
     check_buffers( n_atoms );
 
-    // zero out the forces and energy buffer
+    // Clear scalar accumulators and reusable per-thread force arrays. Separate
+    // arrays let both atoms of a half-list pair be updated without atomics.
     Backend::for_each( n_atoms, [&]( int i ) {
-        forces.row( i )        = Vector3::Zero();
         energy_buffer_atoms[i] = 0.0;
         virial_buffer_atoms[i] = 0.0;
+        for( auto & force_buffer : force_buffers_by_thread )
+        {
+            force_buffer.row( i ) = Vector3::Zero();
+        }
     } );
 
-    iterate_neighbours( rc, box, positions, neighbour_indices, [&]( int n, int m, const Vector3 & r ) {
-        const double R  = r.norm();
-        const double R2 = R * R;
+    // Each half-list pair is handled once; workers accumulate into private force arrays.
+    Backend::for_each( n_atoms, [&]( int n ) {
+        auto & local_forces = force_buffers_by_thread[Backend::get_thread_num()];
+        const int n_neighbours = static_cast<int>( neighbour_indices[n].size() );
 
-        // fetch the "default" sigma and epsilon
-        double epsilon = this->epsilon;
-        double sigma   = this->sigma;
-
-        if( type_ids.has_value() && parameter_map.has_value() )
+        for( int i = 0; i < n_neighbours; ++i )
         {
-            const int type_n = type_ids.value()[n];
-            const int type_m = type_ids.value()[m];
-            // if the interaction is contained in the parameter map, overwrite sigma and epsilon by the value in the
-            // parameter map
-            if( parameter_map->contains( { type_n, type_m } ) )
+            const int m = neighbour_indices[n][i];
+            const Vector3 r_unwrapped = positions.row( n ) - positions.row( m );
+            const Vector3 r = box.pbc_wrap( r_unwrapped ).first;
+            const double R2 = r.squaredNorm();
+            if( R2 > cutoff2 ) continue;
+
+            double epsilon = this->epsilon;
+            double sigma = this->sigma;
+            if( type_ids.has_value() )
             {
-                epsilon = parameter_map.value()[{ type_n, type_m }].first;
-                sigma   = parameter_map.value()[{ type_n, type_m }].second;
+                const int type_n = type_ids.value()[n];
+                const int type_m = type_ids.value()[m];
+                epsilon = epsilon_matrix( type_n, type_m );
+                sigma = sigma_matrix( type_n, type_m );
             }
-            // debug_print( n, m, type_n, type_m, epsilon, sigma, R );
+
+            // Work entirely with r^2 to avoid a square root for every pair.
+            const double inv_R2 = 1.0 / R2;
+            const double sigma_R_2 = sigma * sigma * inv_R2;
+            const double sigma_R_6 = sigma_R_2 * sigma_R_2 * sigma_R_2;
+            const double Vij_unshifted = 4.0 * epsilon * sigma_R_6 * ( sigma_R_6 - 1.0 );
+
+            // Match ASE's smooth=false convention by making V(rc) exactly zero.
+            const double sigma_rc = sigma / rc;
+            const double sigma_rc_2 = sigma_rc * sigma_rc;
+            const double sigma_rc_6 = sigma_rc_2 * sigma_rc_2 * sigma_rc_2;
+            const double Vij =
+                Vij_unshifted - 4.0 * epsilon * sigma_rc_6 * ( sigma_rc_6 - 1.0 );
+
+            const double force_factor =
+                24.0 * epsilon * inv_R2 * sigma_R_6 * ( 2.0 * sigma_R_6 - 1.0 );
+            const Vector3 fij = force_factor * r;
+
+            // Newton's third law supplies the force on m from this one evaluation.
+            local_forces.row( n ) += fij;
+            local_forces.row( m ) -= fij;
+            energy_buffer_atoms[n] += Vij;
+            virial_buffer_atoms[n] += fij.dot( r );
         }
+    } );
 
-        const double sigma_R   = sigma / R;
-        const double sigma_R_2 = sigma_R * sigma_R;
-        const double sigma_R_4 = sigma_R_2 * sigma_R_2;
-        const double sigma_R_6 = sigma_R_4 * sigma_R_2;
-
-        // V_{ij} = 4 \epsilon * ( (\sigma/R_{ij})^12 - (\sigma/R_{ij})^6 )
-        const double Vij_unshifted = 4.0 * epsilon * sigma_R_6 * ( sigma_R_6 - 1.0 );
-
-        // Shift the pair potential so that it is zero at the cutoff, matching
-        // ASE's LennardJones calculator when smooth=false.
-        const double sigma_rc   = sigma / rc;
-        const double sigma_rc_2 = sigma_rc * sigma_rc;
-        const double sigma_rc_6 = sigma_rc_2 * sigma_rc_2 * sigma_rc_2;
-        const double Vij =
-            Vij_unshifted - 4.0 * epsilon * sigma_rc_6 * ( sigma_rc_6 - 1.0 );
-
-        // factor of 1/2 to account for double counting in the neighbour list
-        energy_buffer_atoms[n] += 0.5 * Vij;
-
-        const double dVij_drij = 24.0 * epsilon / R2 * sigma_R_6 * ( 2.0 * sigma_R_6 - 1.0 );
-
-        const Vector3 fij = dVij_drij * r;
-        forces.row( n ) += fij;
-
-        // Divide by 2 to remove double counting of pairs (same reason we divide the energy by 2)
-        virial_buffer_atoms[n] += 0.5 * fij.dot( r );
+    // Reduce private forces only after pair processing, when atom updates cannot race.
+    Backend::for_each( n_atoms, [&]( int i ) {
+        Vector3 total_force = Vector3::Zero();
+        for( const auto & force_buffer : force_buffers_by_thread )
+        {
+            total_force += force_buffer.row( i );
+        }
+        forces.row( i ) = total_force;
     } );
 
     virial = Backend::sum<double>( virial_buffer_atoms );
