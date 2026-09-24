@@ -83,15 +83,15 @@ py.extension_module(
   dependencies: python_deps,
   cpp_args : cpp_args,
   install: true,
-  subdir: 'pycalci/'
+  subdir: 'pycalci'
 )
 
 # pyflowy main package
 py.install_sources([
-    'pycalci/__init__.py',
-    'pycalci/calculators.py'
+    'pycalci/src/pycalci/__init__.py',
+    'pycalci/src/pycalci/calculators.py'
   ],
   pure: false, # install next to compiled extension
-  subdir: 'pycalci/'
+  subdir: 'pycalci'
 )
 

@@ -2,6 +2,7 @@ name: calcienv
 channels:
   - conda-forge
 dependencies:
+  - cxx-compiler
   - pybind11
   - pytest
   - ninja
