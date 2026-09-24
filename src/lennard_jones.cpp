@@ -210,7 +210,15 @@ double LennardJones::energy_and_forces( const Eigen::Ref<Vectorfield> positions,
         const double sigma_R_6 = sigma_R_4 * sigma_R_2;
 
         // V_{ij} = 4 \epsilon * ( (\sigma/R_{ij})^12 - (\sigma/R_{ij})^6 )
-        const double Vij = 4.0 * epsilon * sigma_R_6 * ( sigma_R_6 - 1.0 );
+        const double Vij_unshifted = 4.0 * epsilon * sigma_R_6 * ( sigma_R_6 - 1.0 );
+
+        // Shift the pair potential so that it is zero at the cutoff, matching
+        // ASE's LennardJones calculator when smooth=false.
+        const double sigma_rc   = sigma / rc;
+        const double sigma_rc_2 = sigma_rc * sigma_rc;
+        const double sigma_rc_6 = sigma_rc_2 * sigma_rc_2 * sigma_rc_2;
+        const double Vij =
+            Vij_unshifted - 4.0 * epsilon * sigma_rc_6 * ( sigma_rc_6 - 1.0 );
 
         // factor of 1/2 to account for double counting in the neighbour list
         energy_buffer_atoms[n] += 0.5 * Vij;

@@ -1,4 +1,6 @@
 from util import finite_difference
+from ase import Atoms
+from ase.calculators.lj import LennardJones as ASELennardJones
 from ase.io import read
 from ase.units import fs
 from ase.optimize.fire2 import FIRE2
@@ -7,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from pycalci import find_ghost_atoms
+from pycalci.calculators import LennardJones as CalciLennardJones
 
 from ase.units import kB
 
@@ -104,3 +107,34 @@ def test_ase_calculator_LJ_argon(LJ_liquid_argon):
 
 def test_ase_calculator_LJ_argon_with_H(LJ_liquid_argon_with_H_satellites):
     run_test_ase_calculator(LJ_liquid_argon_with_H_satellites)
+
+
+def test_lennard_jones_matches_ase():
+    epsilon = 0.7
+    sigma = 1.2
+    rc = 3.0 * sigma
+    distance = 1.4 * sigma
+
+    atoms = Atoms(
+        "Ar2",
+        positions=[[0.0, 0.0, 0.0], [distance, 0.0, 0.0]],
+        cell=[10.0, 10.0, 10.0],
+        pbc=False,
+    )
+
+    calci_atoms = atoms.copy()
+    calci_atoms.calc = CalciLennardJones(
+        atoms=calci_atoms, epsilon=epsilon, sigma=sigma, rc=rc, smooth=False
+    )
+
+    ase_atoms = atoms.copy()
+    ase_atoms.calc = ASELennardJones(
+        epsilon=epsilon, sigma=sigma, rc=rc, smooth=False
+    )
+
+    np.testing.assert_allclose(
+        calci_atoms.get_potential_energy(), ase_atoms.get_potential_energy()
+    )
+    np.testing.assert_allclose(
+        calci_atoms.get_forces(), ase_atoms.get_forces(), rtol=1e-12, atol=1e-12
+    )
