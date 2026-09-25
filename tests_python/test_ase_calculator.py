@@ -124,7 +124,7 @@ def test_lennard_jones_matches_ase():
 
     calci_atoms = atoms.copy()
     calci_atoms.calc = CalciLennardJones(
-        atoms=calci_atoms, epsilon=epsilon, sigma=sigma, rc=rc, smooth=False
+        epsilon=epsilon, sigma=sigma, rc=rc, smooth=False
     )
 
     ase_atoms = atoms.copy()

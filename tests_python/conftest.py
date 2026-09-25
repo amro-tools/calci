@@ -22,6 +22,7 @@ def LJ_liquid_argon(ar_fcc : Atoms) -> Atoms:
         "rc": 5.0,
         "ro": None,
         "smooth": False,
+        "compute_general_virial": True,
     }
 
     ar_fcc.calc = LennardJones(atoms=ar_fcc, **para_dict)
@@ -43,6 +44,7 @@ def LJ_liquid_argon_with_H_satellites(ar_fcc_with_h_atoms : Atoms) -> Atoms:
         "rc": 5.0,
         "ro": None,
         "smooth": False,
+        "compute_general_virial": True,
     }
 
     type_ids = ar_fcc_with_h_atoms.numbers
